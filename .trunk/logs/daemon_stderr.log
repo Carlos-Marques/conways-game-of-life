@@ -1,0 +1,2 @@
+[89924:2701351:20231027,132351.732415:INFO crashpad_client_mac.cc:318] restarting handler
+[52743:9346524:20231027,132351.741195:ERROR bootstrap.cc:65] bootstrap_look_up com.apple.ReportCrash: (os/kern) exception protected (32)
