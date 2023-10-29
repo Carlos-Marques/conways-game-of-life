@@ -3,6 +3,9 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::time::Instant;
+
+const ITERATIONS: usize = 100_000;
 
 #[derive(Parser)]
 struct Opts {
@@ -25,7 +28,11 @@ fn main() {
     let kernel_reader = get_file_reader(opts.kernel);
     let ((kernel_height, kernel_width), kernel) = parse_matrix(kernel_reader);
 
-    loop {
+    println!("Done reading files");
+
+    let start = Instant::now();
+
+    for _ in 0..=ITERATIONS {
         let neighbors = apply_kernel(
             &board,
             board_width,
@@ -41,17 +48,18 @@ fn main() {
                 _ => 0,
             };
         }
-
-        print!("\x1B[2J\x1B[1;1H");
-        for row in 0..board_height {
-            for column in 0..board_width {
-                print!("{} ", board[row * board_width + column]);
-            }
-            println!();
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(opts.sleep_millis));
     }
+
+    let duration = start.elapsed();
+
+    print!("\x1B[2J\x1B[1;1H");
+    for row in 0..board_height {
+        for column in 0..board_width {
+            print!("{} ", board[row * board_width + column]);
+        }
+        println!();
+    }
+    println!("Time elapsed for {ITERATIONS} iters is: {:?}", duration);
 }
 
 fn get_file_reader(path: PathBuf) -> BufReader<File> {
@@ -113,7 +121,7 @@ fn get_1d_index(row: usize, width: usize, column: usize) -> usize {
     row * width + column
 }
 
-fn apply_kernel(
+pub fn apply_kernel(
     input: &[i32],
     input_width: usize,
     input_height: usize,
