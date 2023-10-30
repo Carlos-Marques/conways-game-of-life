@@ -1,8 +1,20 @@
+#![feature(portable_simd)]
+
 use clap::Parser;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::time::Instant;
+
+#[allow(dead_code)]
+mod conv;
+#[allow(dead_code)]
+mod sumcounts;
+#[allow(dead_code)]
+mod vectorized;
+
+const ITERATIONS: usize = 1_000_000;
 
 #[derive(Parser)]
 struct Opts {
@@ -16,6 +28,30 @@ struct Opts {
     sleep_millis: u64,
 }
 
+#[inline(never)]
+fn run_board(
+    board: &mut [i32],
+    board_width: usize,
+    board_height: usize,
+    kernel: &[i32],
+    kernel_width: usize,
+    kernel_height: usize,
+) {
+    // use conv as strategy;
+    // use sumcounts as strategy;
+    use vectorized as strategy;
+
+    strategy::run(
+        ITERATIONS,
+        board,
+        board_width,
+        board_height,
+        kernel,
+        kernel_width,
+        kernel_height,
+    );
+}
+
 fn main() {
     let opts: Opts = Opts::parse();
 
@@ -25,33 +61,29 @@ fn main() {
     let kernel_reader = get_file_reader(opts.kernel);
     let ((kernel_height, kernel_width), kernel) = parse_matrix(kernel_reader);
 
-    loop {
-        let neighbors = apply_kernel(
-            &board,
-            board_width,
-            board_height,
-            &kernel,
-            kernel_width,
-            kernel_height,
-        );
+    println!("Done reading files");
 
-        for index in 0..board.len() {
-            board[index] = match (board[index], neighbors[index]) {
-                (1, 2) | (1, 3) | (0, 3) => 1,
-                _ => 0,
-            };
+    let start = Instant::now();
+
+    run_board(
+        &mut board,
+        board_width,
+        board_height,
+        &kernel,
+        kernel_width,
+        kernel_height,
+    );
+
+    let duration = start.elapsed();
+
+    print!("\x1B[2J\x1B[1;1H");
+    for row in 0..board_height {
+        for column in 0..board_width {
+            print!("{} ", board[row * board_width + column]);
         }
-
-        print!("\x1B[2J\x1B[1;1H");
-        for row in 0..board_height {
-            for column in 0..board_width {
-                print!("{} ", board[row * board_width + column]);
-            }
-            println!();
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(opts.sleep_millis));
+        println!();
     }
+    println!("Time elapsed for {ITERATIONS} iters is: {:?}", duration);
 }
 
 fn get_file_reader(path: PathBuf) -> BufReader<File> {
@@ -73,94 +105,4 @@ fn parse_matrix<R: BufRead>(reader: R) -> ((usize, usize), Vec<i32>) {
         .collect();
 
     ((height, width), matrix)
-}
-
-fn is_within_boundaries(
-    input_row: isize,
-    input_column: isize,
-    input_height: isize,
-    input_width: isize,
-) -> bool {
-    input_row >= 0
-        && input_row < input_height as isize
-        && input_column >= 0
-        && input_column < input_width as isize
-}
-
-fn get_input_location(
-    matrix_location: usize,
-    kernel_location: usize,
-    kernel_offset: usize,
-) -> isize {
-    matrix_location as isize + kernel_location as isize - kernel_offset as isize
-}
-
-fn get_input_position(
-    row: usize,
-    column: usize,
-    kernel_row: usize,
-    kernel_column: usize,
-    kernel_offset_height: usize,
-    kernel_offset_width: usize,
-) -> (isize, isize) {
-    let input_row = get_input_location(row, kernel_row, kernel_offset_height);
-    let input_column = get_input_location(column, kernel_column, kernel_offset_width);
-
-    (input_row, input_column)
-}
-
-fn get_1d_index(row: usize, width: usize, column: usize) -> usize {
-    row * width + column
-}
-
-fn apply_kernel(
-    input: &[i32],
-    input_width: usize,
-    input_height: usize,
-    kernel: &[i32],
-    kernel_width: usize,
-    kernel_height: usize,
-) -> Vec<i32> {
-    let kernel_offset_width = kernel_width / 2;
-    let kernel_offset_height = kernel_height / 2;
-
-    (0..input_height)
-        .flat_map(|row| {
-            (0..input_width).map(move |column| {
-                (0..kernel_height)
-                    .flat_map(|kernel_row| {
-                        (0..kernel_width).filter_map(move |kernel_column| {
-                            let (input_row, input_column) = get_input_position(
-                                row,
-                                column,
-                                kernel_row,
-                                kernel_column,
-                                kernel_offset_height,
-                                kernel_offset_width,
-                            );
-
-                            if is_within_boundaries(
-                                input_row,
-                                input_column,
-                                input_height as isize,
-                                input_width as isize,
-                            ) {
-                                let input_index = get_1d_index(
-                                    input_row as usize,
-                                    input_width,
-                                    input_column as usize,
-                                );
-                                let kernel_index =
-                                    get_1d_index(kernel_row, kernel_width, kernel_column);
-
-                                Some(input[input_index] * kernel[kernel_index])
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                    .sum::<i32>()
-            })
-        })
-        .collect()
 }
