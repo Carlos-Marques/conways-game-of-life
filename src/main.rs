@@ -5,9 +5,12 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::time::Instant;
 
+#[allow(dead_code)]
 mod conv;
+#[allow(dead_code)]
+mod sumcounts;
 
-const ITERATIONS: usize = 100_000;
+const ITERATIONS: usize = 1_000_000;
 
 #[derive(Parser)]
 struct Opts {
@@ -19,6 +22,29 @@ struct Opts {
 
     #[clap(short, long, default_value = "500")]
     sleep_millis: u64,
+}
+
+#[inline(never)]
+fn run_board(
+    board: &mut [i32],
+    board_width: usize,
+    board_height: usize,
+    kernel: &[i32],
+    kernel_width: usize,
+    kernel_height: usize,
+) {
+    // use conv as strategy;
+    use sumcounts as strategy;
+
+    strategy::run(
+        ITERATIONS,
+        board,
+        board_width,
+        board_height,
+        kernel,
+        kernel_width,
+        kernel_height,
+    );
 }
 
 fn main() {
@@ -34,8 +60,7 @@ fn main() {
 
     let start = Instant::now();
 
-    conv::run(
-        ITERATIONS,
+    run_board(
         &mut board,
         board_width,
         board_height,
