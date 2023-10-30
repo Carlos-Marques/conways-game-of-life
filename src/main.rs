@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 use clap::Parser;
 use std::fs::File;
 use std::io::BufRead;
@@ -9,6 +11,8 @@ use std::time::Instant;
 mod conv;
 #[allow(dead_code)]
 mod sumcounts;
+#[allow(dead_code)]
+mod vectorized;
 
 const ITERATIONS: usize = 1_000_000;
 
@@ -34,7 +38,8 @@ fn run_board(
     kernel_height: usize,
 ) {
     // use conv as strategy;
-    use sumcounts as strategy;
+    // use sumcounts as strategy;
+    use vectorized as strategy;
 
     strategy::run(
         ITERATIONS,
